@@ -25,7 +25,7 @@ export async function renderExtrato(container) {
       return true;
     });
 
-    const f = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
+    const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
     const html = `
       <!-- Filters -->

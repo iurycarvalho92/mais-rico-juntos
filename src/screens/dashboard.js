@@ -87,7 +87,7 @@ export async function renderDashboard(container) {
   }).join(' ');
   
   // Formatters
-  const f = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
+  const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
   
   // Balance Text
   let balanceText = "Vocês estão quites este mês!";

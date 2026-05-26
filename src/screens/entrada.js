@@ -54,7 +54,7 @@ export async function renderEntrada(container) {
       </button>
     </div>
     
-    <div class="display-value" id="val-display">€0,00</div>
+    <div class="display-value" id="val-display">R$ 0,00</div>
     
     <div id="ai-loading" style="display:none; text-align: center; color: var(--primary-color); margin-bottom: 20px;">
       <span style="font-size: 1.5rem; animation: pulse 1s infinite;">Processando imagem...</span>
@@ -125,7 +125,7 @@ export async function renderEntrada(container) {
   
   function updateDisplay() {
     const num = parseFloat(currentDisplay || '0');
-    valDisplay.textContent = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(num);
+    valDisplay.textContent = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
   }
   
   // Numpad events
