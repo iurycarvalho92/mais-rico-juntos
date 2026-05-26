@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Mais Rico Juntos</title>
+    <!-- Google Fonts for Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="app" class="app-container">
+      <!-- Top Header -->
+      <header class="app-header">
+        <h1 id="screen-title">Dashboard</h1>
+        <div class="user-avatars" id="header-avatars">
+          <!-- Avatars will be injected here -->
+        </div>
+      </header>
+
+      <!-- Main Content Area -->
+      <main id="main-content" class="screen-content">
+        <!-- Screens will be mounted here dynamically -->
+      </main>
+
+      <!-- Bottom Navigation -->
+      <nav class="bottom-nav">
+        <button class="nav-item active" data-target="dashboard">
+          <span class="icon">📊</span>
+          <span>Resumo</span>
+        </button>
+        <button class="nav-item fab-wrapper" data-target="entrada">
+          <div class="fab">
+            <span class="icon">+</span>
+          </div>
+        </button>
+        <button class="nav-item" data-target="extrato">
+          <span class="icon">📋</span>
+          <span>Extrato</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Application Logic -->
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
