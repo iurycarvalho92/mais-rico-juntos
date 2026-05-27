@@ -16,9 +16,8 @@ const DOM = {
 
 // E-mails autorizados
 const AUTHORIZED_EMAILS = [
-  // TODO: Adicione os emails reais do casal aqui
-  "iuryadelaide@gmail.com",
-  "sua-esposa@gmail.com"
+  "iury.decarvalho@gmail.com",
+  "giuliarayel@gmail.com"
 ];
 
 function isAuthorized(email) {
