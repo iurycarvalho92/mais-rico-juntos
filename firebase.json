@@ -2,5 +2,13 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Mais Rico Juntos",
+        "supportEmail": "iury.decarvalho@gmail.com"
+      }
+    }
   }
 }
