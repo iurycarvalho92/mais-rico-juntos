@@ -126,6 +126,23 @@ export async function renderConfiguracoes(container) {
     
     if (desc && val > 0 && dia >= 1 && dia <= 31) {
       await db.insert('receitas_fixas', { descricao: desc, valor_estimado: val, dia_recebimento: dia, utilizador_id: user });
+      
+      // Criar também a instância deste mês automaticamente
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      const dataVencimento = new Date(currentYear, currentMonth, dia).toISOString().split('T')[0];
+      
+      await db.insert('lancamentos_mes', {
+        valor: val,
+        data_vencimento: dataVencimento,
+        categoria_id: null,
+        descricao_custom: desc,
+        tipo_lancamento: 'RECEITA',
+        pago_por: user,
+        regra_divisao: 'INDIVIDUAL',
+        status: 'PENDENTE'
+      });
+      
       renderConfiguracoes(container);
     }
   });
@@ -143,6 +160,23 @@ export async function renderConfiguracoes(container) {
         descricao: desc, valor_estimado: val, dia_vencimento: dia, 
         categoria_id: parseInt(cat), pago_por_padrao: user, regra_divisao_percent: parseInt(split) 
       });
+      
+      // Criar também a instância deste mês automaticamente para atualizar o Resumo
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      const dataVencimento = new Date(currentYear, currentMonth, dia).toISOString().split('T')[0];
+      
+      await db.insert('lancamentos_mes', {
+        valor: val,
+        data_vencimento: dataVencimento,
+        categoria_id: parseInt(cat),
+        descricao_custom: desc,
+        tipo_lancamento: 'DESPESA_FIXA',
+        pago_por: user,
+        regra_divisao_percent: parseInt(split),
+        status: 'PENDENTE'
+      });
+      
       renderConfiguracoes(container);
     }
   });

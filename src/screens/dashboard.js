@@ -40,8 +40,8 @@ export async function renderDashboard(container) {
         else if (l.tipo_lancamento === 'DESPESA_FIXA') custosFixos += val;
         else gastoVariavel += val;
         
-        // Balance Logic (Current Month)
-        if (l.tipo_lancamento !== 'RECEITA') {
+        // Balance Logic (Current Month) - Somente efetivados (PAGOS) contam para quem deve a quem
+        if (l.tipo_lancamento !== 'RECEITA' && l.status === 'PAGO') {
           let u1Share = 0; let u2Share = 0;
           
           if (l.regra_divisao_percent !== undefined) {
