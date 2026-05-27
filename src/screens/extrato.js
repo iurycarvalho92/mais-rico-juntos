@@ -136,6 +136,11 @@ export async function renderExtrato(container) {
                   <div style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); display: inline-block; margin-top: 4px; color: ${l.status === 'PENDENTE' ? 'var(--warning-color)' : 'var(--success-color)'}">
                     ${l.status}
                   </div>
+                  ${!isReceita ? `
+                  <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 5px;">
+                    Divisão: ${l.regra_divisao_percent !== undefined ? `${100 - l.regra_divisao_percent}% / ${l.regra_divisao_percent}%` : '50% / 50%'}
+                  </div>
+                  ` : ''}
                 </div>
               </div>
               
@@ -241,6 +246,7 @@ export async function renderExtrato(container) {
                     <input type="range" id="edit-split" min="0" max="100" value="${defaultSplit}" style="flex: 1;" />
                     <span style="font-size: 0.75rem;">${users[1].nome.charAt(0)}</span>
                   </div>
+                  <div id="edit-split-label" style="font-size: 0.75rem; font-weight: bold; color: var(--primary-color); text-align: center; margin-top: 5px;"></div>
                 </div>
               ` : ''}
               
@@ -262,6 +268,31 @@ export async function renderExtrato(container) {
         
         const modalContainer = document.getElementById('edit-modal-container');
         modalContainer.innerHTML = modalHtml;
+        
+        // Add dynamic split label logic if it's an expense
+        if (!isReceita) {
+          const editSplit = document.getElementById('edit-split');
+          const editVal = document.getElementById('edit-val');
+          const editSplitLabel = document.getElementById('edit-split-label');
+          
+          const updateEditSplitLabel = () => {
+            const percent2 = parseInt(editSplit.value);
+            const percent1 = 100 - percent2;
+            const val = parseFloat(editVal.value || '0');
+            
+            if (val > 0) {
+              const v1 = val * (percent1 / 100);
+              const v2 = val * (percent2 / 100);
+              editSplitLabel.innerHTML = `${users[0].nome}: ${f.format(v1)} | ${users[1].nome}: ${f.format(v2)}`;
+            } else {
+              editSplitLabel.textContent = `${percent1}% ${users[0].nome} / ${percent2}% ${users[1].nome}`;
+            }
+          };
+          
+          editSplit.addEventListener('input', updateEditSplitLabel);
+          editVal.addEventListener('input', updateEditSplitLabel);
+          updateEditSplitLabel(); // Initial call
+        }
         
         document.getElementById('btn-cancel-edit').addEventListener('click', () => {
           modalContainer.innerHTML = '';
