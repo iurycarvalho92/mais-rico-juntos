@@ -44,7 +44,7 @@ export async function runRecurrenceEngine() {
       descricao_custom: d.descricao,
       tipo_lancamento: 'DESPESA_FIXA',
       pago_por: d.pago_por_padrao,
-      regra_divisao: d.regra_divisao,
+      regra_divisao: d.regra_divisao || null,
       regra_divisao_percent: d.regra_divisao_percent !== undefined ? d.regra_divisao_percent : 50, // default 50/50 if missing
       status: 'PENDENTE'
     });
