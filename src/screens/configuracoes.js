@@ -80,11 +80,15 @@ export async function renderConfiguracoes(container) {
             ${users.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')}
           </select>
         </div>
-        <select id="des-split" style="margin-bottom: 10px; font-size: 0.85rem; padding: 8px;">
-            <option value="50_50">50 / 50</option>
-            <option value="100_USER_A">100% ${users[0].nome}</option>
-            <option value="100_USER_B">100% ${users[1].nome}</option>
-        </select>
+        <div style="margin-bottom: 10px;">
+          <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 2px;">Divisão da Conta</div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[0].nome.charAt(0)}</span>
+            <input type="range" id="des-split" min="0" max="100" value="50" style="flex: 1;" />
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[1].nome.charAt(0)}</span>
+          </div>
+          <div id="des-split-label" style="font-size: 0.75rem; font-weight: bold; color: var(--primary-color); text-align: center; margin-top: 2px;">50% / 50%</div>
+        </div>
         <button id="btn-add-des" class="btn btn-primary" style="padding: 8px; font-size: 0.85rem;">Adicionar Conta Fixa</button>
       </div>
     </div>
@@ -93,6 +97,27 @@ export async function renderConfiguracoes(container) {
   container.innerHTML = html;
   
   // Logic
+  const splitSlider = document.getElementById('des-split');
+  const splitLabel = document.getElementById('des-split-label');
+  const desValInput = document.getElementById('des-val');
+  
+  function updateConfigSplitLabel() {
+    const percent2 = parseInt(splitSlider.value);
+    const percent1 = 100 - percent2;
+    const val = parseFloat(desValInput.value || '0');
+    
+    if (val > 0) {
+      const v1 = val * (percent1 / 100);
+      const v2 = val * (percent2 / 100);
+      splitLabel.innerHTML = `${users[0].nome}: ${f.format(v1)} | ${users[1].nome}: ${f.format(v2)}`;
+    } else {
+      splitLabel.textContent = `${percent1}% ${users[0].nome} / ${percent2}% ${users[1].nome}`;
+    }
+  }
+  
+  splitSlider.addEventListener('input', updateConfigSplitLabel);
+  desValInput.addEventListener('input', updateConfigSplitLabel);
+
   document.getElementById('btn-add-rec').addEventListener('click', async () => {
     const desc = document.getElementById('rec-desc').value.trim();
     const val = parseFloat(document.getElementById('rec-val').value);
@@ -116,7 +141,7 @@ export async function renderConfiguracoes(container) {
     if (desc && val > 0 && dia >= 1 && dia <= 31) {
       await db.insert('despesas_fixas', { 
         descricao: desc, valor_estimado: val, dia_vencimento: dia, 
-        categoria_id: parseInt(cat), pago_por_padrao: user, regra_divisao: split 
+        categoria_id: parseInt(cat), pago_por_padrao: user, regra_divisao_percent: parseInt(split) 
       });
       renderConfiguracoes(container);
     }

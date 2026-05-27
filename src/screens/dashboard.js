@@ -9,8 +9,11 @@ export async function renderDashboard(container) {
     
     const lancamentos = await db.getTable('lancamentos_mes');
     const users = await db.getTable('utilizadores');
+    const categorias = await db.getTable('categorias');
     const receitas = await db.getTable('receitas_fixas');
     const despesas = await db.getTable('despesas_fixas');
+    
+    const catMap = Object.fromEntries(categorias.map(c => [c.id, c]));
     
     // 1. Calculate Current Month Metrics
     let receitasPrevistas = 0;
@@ -40,9 +43,18 @@ export async function renderDashboard(container) {
         // Balance Logic (Current Month)
         if (l.tipo_lancamento !== 'RECEITA') {
           let u1Share = 0; let u2Share = 0;
-          if (l.regra_divisao === '50_50') { u1Share = val / 2; u2Share = val / 2; }
-          else if (l.regra_divisao === '100_USER_A') u1Share = val;
-          else if (l.regra_divisao === '100_USER_B') u2Share = val;
+          
+          if (l.regra_divisao_percent !== undefined) {
+             const p2 = parseInt(l.regra_divisao_percent);
+             const p1 = 100 - p2;
+             u1Share = val * (p1 / 100);
+             u2Share = val * (p2 / 100);
+          } else {
+            // Fallback old rules
+            if (l.regra_divisao === '50_50') { u1Share = val / 2; u2Share = val / 2; }
+            else if (l.regra_divisao === '100_USER_A') u1Share = val;
+            else if (l.regra_divisao === '100_USER_B') u2Share = val;
+          }
           
           if (l.pago_por === u1Id) u1Balance += u2Share;
           else if (l.pago_por === u2Id) u1Balance -= u1Share;
@@ -61,6 +73,21 @@ export async function renderDashboard(container) {
         }
       }
     }
+    
+    // Calculate Category Breakdown (Current month expenses)
+    const categoryBreakdown = {};
+    for (const l of lancamentos) {
+      if (l.data_vencimento.startsWith(currentMonthStr) && l.tipo_lancamento !== 'RECEITA') {
+        const catId = l.categoria_id;
+        if (!categoryBreakdown[catId]) categoryBreakdown[catId] = 0;
+        categoryBreakdown[catId] += parseFloat(l.valor);
+      }
+    }
+    
+    // Sort categories by highest spend
+    const sortedCategories = Object.entries(categoryBreakdown)
+      .map(([id, val]) => ({ cat: catMap[id], total: val }))
+      .sort((a, b) => b.total - a.total);
     
     const dinheiroLivre = receitasPrevistas - custosFixos - gastoVariavel;
     const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -160,6 +187,33 @@ export async function renderDashboard(container) {
           <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary-color)">${f.format(dinheiroLivre)}</div>
         </div>
       </div>
+      
+      <!-- Category Breakdown -->
+      ${sortedCategories.length > 0 ? `
+      <div class="card" style="margin-bottom: 20px; padding: 15px;">
+        <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">Gastos por Categoria (Mês Atual)</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${sortedCategories.map(c => {
+             const percentage = ((c.total / (custosFixos + gastoVariavel)) * 100).toFixed(1);
+             return `
+               <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                 <div style="display: flex; align-items: center; gap: 8px;">
+                   <span style="font-size: 1.1rem;">${c.cat?.icone || '❓'}</span>
+                   <span>${c.cat?.nome || 'Sem Categoria'}</span>
+                 </div>
+                 <div style="display: flex; align-items: center; gap: 10px;">
+                   <span style="font-weight: 600;">${f.format(c.total)}</span>
+                   <span style="color: var(--text-secondary); font-size: 0.75rem; width: 35px; text-align: right;">${percentage}%</span>
+                 </div>
+               </div>
+               <div style="width: 100%; height: 6px; background: var(--bg-color); border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
+                 <div style="height: 100%; width: ${percentage}%; background: var(--primary-color); border-radius: 3px;"></div>
+               </div>
+             `;
+          }).join('')}
+        </div>
+      </div>
+      ` : ''}
       
       <!-- Line Chart -->
       <div class="card" style="position: relative;">

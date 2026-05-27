@@ -12,11 +12,16 @@ const initialData = {
   categorias: [
     { id: 1, nome: 'Moradia', icone: '🏠' },
     { id: 2, nome: 'Mercado', icone: '🛒' },
-    { id: 3, nome: 'Lazer', icone: '🎉' },
-    { id: 4, nome: 'Saúde', icone: '⚕️' },
-    { id: 5, nome: 'Transporte', icone: '🚗' },
-    { id: 6, nome: 'Malu e Lila', icone: '🐶' },
-    { id: 7, nome: 'Educação', icone: '📚' }
+    { id: 3, nome: 'Restaurante/Delivery', icone: '🍔' },
+    { id: 4, nome: 'Lazer & Cultura', icone: '🎉' },
+    { id: 5, nome: 'Saúde & Farmácia', icone: '⚕️' },
+    { id: 6, nome: 'Transporte & Carro', icone: '🚗' },
+    { id: 7, nome: 'Malu e Lila', icone: '🐶' },
+    { id: 8, nome: 'Educação', icone: '📚' },
+    { id: 9, nome: 'Viagens', icone: '✈️' },
+    { id: 10, nome: 'Vestuário', icone: '👕' },
+    { id: 11, nome: 'Cuidados Pessoais', icone: '💇' },
+    { id: 12, nome: 'Outros', icone: '📦' }
   ],
   receitas_fixas: [],
   despesas_fixas: [],
@@ -47,6 +52,22 @@ export const db = {
       }
     } catch (e) {
       console.error("Error initializing DB:", e);
+    }
+    
+    // Always force sync categories to ensure updates propagate to existing databases
+    await this.syncCategorias();
+  },
+  
+  async syncCategorias() {
+    try {
+      const snap = await getDocs(collection(firestore, 'categorias'));
+      const existingIds = snap.docs.map(d => parseInt(d.id));
+      
+      for (const item of initialData.categorias) {
+        await setDoc(doc(firestore, 'categorias', String(item.id)), item);
+      }
+    } catch (e) {
+      console.error("Error syncing categories:", e);
     }
   },
   

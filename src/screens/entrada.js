@@ -51,6 +51,19 @@ export async function renderEntrada(container) {
         border-radius: var(--radius-sm);
         margin-top: 10px;
       }
+      .slider-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 5px;
+      }
+      .slider-label {
+        font-size: 0.8rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        text-align: center;
+        margin-top: 5px;
+      }
     </style>
 
     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -105,12 +118,13 @@ export async function renderEntrada(container) {
         </div>
         
         <div class="form-group" style="flex: 1;">
-          <label>Divisão</label>
-          <select id="select-split">
-            <option value="50_50">50 / 50</option>
-            <option value="100_USER_A">100% ${users[0].nome}</option>
-            <option value="100_USER_B">100% ${users[1].nome}</option>
-          </select>
+          <label>Divisão da Despesa</label>
+          <div class="slider-container">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[0].nome.charAt(0)}</span>
+            <input type="range" id="input-split-slider" min="0" max="100" value="50" style="flex: 1;" />
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[1].nome.charAt(0)}</span>
+          </div>
+          <div class="slider-label" id="split-label">50% / 50%</div>
         </div>
       </div>
       
@@ -142,7 +156,8 @@ export async function renderEntrada(container) {
   const inputDesc = document.getElementById('input-desc');
   const selectCat = document.getElementById('select-cat');
   const selectPayer = document.getElementById('select-payer');
-  const selectSplit = document.getElementById('select-split');
+  const splitSlider = document.getElementById('input-split-slider');
+  const splitLabel = document.getElementById('split-label');
   const inputDate = document.getElementById('input-date');
   const selectRepeat = document.getElementById('select-repeat');
   const parcelasContainer = document.getElementById('parcelas-container');
@@ -151,6 +166,9 @@ export async function renderEntrada(container) {
   const aiLoading = document.getElementById('ai-loading');
   const numpad = document.getElementById('numpad');
   
+  // Format currency
+  const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  
   // Toggle Parcelas input
   selectRepeat.addEventListener('change', (e) => {
     parcelasContainer.style.display = e.target.value === 'parcelada' ? 'block' : 'none';
@@ -158,8 +176,27 @@ export async function renderEntrada(container) {
   
   function updateDisplay() {
     const num = parseFloat(currentDisplay || '0');
-    valDisplay.textContent = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+    valDisplay.textContent = f.format(num);
+    updateSplitLabel(); // Update monetary split preview
   }
+  
+  function updateSplitLabel() {
+    const percent2 = parseInt(splitSlider.value);
+    const percent1 = 100 - percent2;
+    const num = parseFloat(currentDisplay || '0');
+    
+    if (num > 0) {
+      const val1 = num * (percent1 / 100);
+      const val2 = num * (percent2 / 100);
+      splitLabel.innerHTML = `${users[0].nome}: <span style="color:var(--text-primary)">${f.format(val1)}</span> | ${users[1].nome}: <span style="color:var(--text-primary)">${f.format(val2)}</span>`;
+    } else {
+      splitLabel.textContent = `${percent1}% ${users[0].nome} / ${percent2}% ${users[1].nome}`;
+    }
+  }
+  
+  // Initial Split label
+  updateSplitLabel();
+  splitSlider.addEventListener('input', updateSplitLabel);
   
   // Numpad events
   container.querySelectorAll('.num-btn').forEach(btn => {
@@ -230,7 +267,7 @@ export async function renderEntrada(container) {
         descricao: inputDesc.value.trim(),
         valor_estimado: val,
         dia_vencimento: targetDate.getDate(),
-        regra_divisao: selectSplit.value,
+        regra_divisao_percent: parseInt(splitSlider.value),
         pago_por_padrao: selectPayer.value
       });
       // Também gera o lançamento do mês atual
@@ -241,7 +278,7 @@ export async function renderEntrada(container) {
         descricao_custom: inputDesc.value.trim(),
         tipo_lancamento: 'DESPESA_FIXA',
         pago_por: selectPayer.value,
-        regra_divisao: selectSplit.value,
+        regra_divisao_percent: parseInt(splitSlider.value),
         status: status
       });
     } else if (selectRepeat.value === 'parcelada') {
@@ -259,7 +296,7 @@ export async function renderEntrada(container) {
           descricao_custom: `${inputDesc.value.trim()} (${i+1}/${numParcelas})`,
           tipo_lancamento: 'DESPESA_VARIAVEL',
           pago_por: selectPayer.value,
-          regra_divisao: selectSplit.value,
+          regra_divisao_percent: parseInt(splitSlider.value),
           status: isFutureParc ? 'PENDENTE' : 'PAGO'
         });
       }
@@ -272,7 +309,7 @@ export async function renderEntrada(container) {
         descricao_custom: inputDesc.value.trim(),
         tipo_lancamento: 'DESPESA_VARIAVEL',
         pago_por: selectPayer.value,
-        regra_divisao: selectSplit.value,
+        regra_divisao_percent: parseInt(splitSlider.value),
         status: status
       });
     }
