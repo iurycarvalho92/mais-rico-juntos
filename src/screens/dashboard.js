@@ -226,7 +226,7 @@ export async function renderDashboard(container) {
       targetDate.setDate(targetDate.getDate() + dataIndex);
       
       tooltip.innerHTML = `<div>${targetDate.toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})}</div><div style="font-weight:bold; color:var(--primary-color);">${f.format(val)}</div>`;
-      tooltip.style.left = \`\${x - 40}px\`;
+      tooltip.style.left = (x - 40) + 'px';
       tooltip.style.display = 'block';
     });
     
