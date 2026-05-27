@@ -129,8 +129,8 @@ export async function renderConfiguracoes(container) {
       
       // Criar também a instância deste mês automaticamente
       const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth();
-      const dataVencimento = new Date(currentYear, currentMonth, dia).toISOString().split('T')[0];
+      const currentMonth = new Date().getMonth() + 1;
+      const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
       
       await db.insert('lancamentos_mes', {
         valor: val,
@@ -163,8 +163,8 @@ export async function renderConfiguracoes(container) {
       
       // Criar também a instância deste mês automaticamente para atualizar o Resumo
       const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth();
-      const dataVencimento = new Date(currentYear, currentMonth, dia).toISOString().split('T')[0];
+      const currentMonth = new Date().getMonth() + 1;
+      const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
       
       await db.insert('lancamentos_mes', {
         valor: val,

@@ -19,7 +19,7 @@ export async function runRecurrenceEngine() {
   
   // 1. Process Receitas Fixas
   for (const r of receitas) {
-    const dataVencimento = new Date(currentYear, currentMonth - 1, r.dia_recebimento).toISOString().split('T')[0];
+    const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(r.dia_recebimento).padStart(2, '0')}`;
     
     await db.insert('lancamentos_mes', {
       valor: r.valor_estimado,
@@ -35,7 +35,7 @@ export async function runRecurrenceEngine() {
   
   // 2. Process Despesas Fixas
   for (const d of despesas) {
-    const dataVencimento = new Date(currentYear, currentMonth - 1, d.dia_vencimento).toISOString().split('T')[0];
+    const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d.dia_vencimento).padStart(2, '0')}`;
     
     await db.insert('lancamentos_mes', {
       valor: d.valor_estimado,
