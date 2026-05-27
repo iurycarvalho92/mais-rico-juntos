@@ -4,6 +4,7 @@ import { renderDashboard } from './src/screens/dashboard.js';
 import { renderExtrato } from './src/screens/extrato.js';
 import { renderEntrada } from './src/screens/entrada.js';
 import { renderPlanejamento } from './src/screens/planejamento.js';
+import { renderConfiguracoes } from './src/screens/configuracoes.js';
 import { auth, googleProvider, signInWithPopup, signOut } from './src/firebase.js';
 
 const DOM = {
@@ -72,6 +73,9 @@ async function renderLogin() {
 auth.onAuthStateChanged(async (user) => {
   if (user && isAuthorized(user.email)) {
     // Inject original HTML structure back since we overwrote appContainer
+    // Sync user profile name with DB
+    await syncUserProfile(user);
+
     DOM.appContainer.innerHTML = `
       <header class="app-header">
         <h1 id="screen-title">Resumo</h1>
@@ -93,6 +97,10 @@ auth.onAuthStateChanged(async (user) => {
         <button class="nav-item" data-target="extrato">
           <span class="icon">📋</span>
           <span>Extrato</span>
+        </button>
+        <button class="nav-item" data-target="configuracoes">
+          <span class="icon">⚙️</span>
+          <span>Config</span>
         </button>
       </nav>
     `;
@@ -163,6 +171,10 @@ export function navigate(screen) {
     case 'planejamento':
       DOM.screenTitle.textContent = 'Planejamento e Metas';
       renderPlanejamento(DOM.mainContent);
+      break;
+    case 'configuracoes':
+      DOM.screenTitle.textContent = 'Configurações';
+      renderConfiguracoes(DOM.mainContent);
       break;
   }
 }

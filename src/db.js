@@ -15,7 +15,7 @@ const initialData = {
     { id: 3, nome: 'Lazer', icone: '🎉' },
     { id: 4, nome: 'Saúde', icone: '⚕️' },
     { id: 5, nome: 'Transporte', icone: '🚗' },
-    { id: 6, nome: 'Pets', icone: '🐾' },
+    { id: 6, nome: 'Malu e Lila', icone: '🐶' },
     { id: 7, nome: 'Educação', icone: '📚' }
   ],
   receitas_fixas: [],

@@ -45,10 +45,16 @@ export async function renderEntrada(container) {
         font-size: 0.85rem;
         color: var(--text-secondary);
       }
+      .advanced-options {
+        background: rgba(0,0,0,0.2);
+        padding: 10px;
+        border-radius: var(--radius-sm);
+        margin-top: 10px;
+      }
     </style>
 
     <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h2 style="margin: 0;">Novo Gasto</h2>
+      <h2 style="margin: 0;">Novo Lançamento</h2>
       <button id="btn-scan" class="btn btn-primary" style="width: auto; padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; gap: 8px;">
         <span>📷</span> IA Scan
       </button>
@@ -92,7 +98,7 @@ export async function renderEntrada(container) {
       
       <div class="flex-between" style="gap: 15px;">
         <div class="form-group" style="flex: 1;">
-          <label>Pago por</label>
+          <label>Pago por / Responsável</label>
           <select id="select-payer">
             ${users.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')}
           </select>
@@ -108,7 +114,24 @@ export async function renderEntrada(container) {
         </div>
       </div>
       
-      <button id="btn-save" class="btn btn-primary" style="margin-top: 10px;">Guardar Lançamento</button>
+      <div class="form-group advanced-options">
+        <label>Data do Lançamento</label>
+        <input type="date" id="input-date" value="${new Date().toISOString().split('T')[0]}" />
+        
+        <label style="margin-top: 10px;">Repetição</label>
+        <select id="select-repeat">
+          <option value="unica">Única (Despesa Variável)</option>
+          <option value="recorrente">Recorrente Mensal (Conta Fixa)</option>
+          <option value="parcelada">Parcelada (Ex: 3x, 6x...)</option>
+        </select>
+        
+        <div id="parcelas-container" style="display:none; margin-top:10px;">
+          <label>Número de Meses/Parcelas</label>
+          <input type="number" id="input-parcelas" value="2" min="2" max="48" />
+        </div>
+      </div>
+      
+      <button id="btn-save" class="btn btn-primary" style="margin-top: 10px;">Salvar Lançamento</button>
     </div>
   `;
   
@@ -120,8 +143,18 @@ export async function renderEntrada(container) {
   const selectCat = document.getElementById('select-cat');
   const selectPayer = document.getElementById('select-payer');
   const selectSplit = document.getElementById('select-split');
+  const inputDate = document.getElementById('input-date');
+  const selectRepeat = document.getElementById('select-repeat');
+  const parcelasContainer = document.getElementById('parcelas-container');
+  const inputParcelas = document.getElementById('input-parcelas');
+  
   const aiLoading = document.getElementById('ai-loading');
   const numpad = document.getElementById('numpad');
+  
+  // Toggle Parcelas input
+  selectRepeat.addEventListener('change', (e) => {
+    parcelasContainer.style.display = e.target.value === 'parcelada' ? 'block' : 'none';
+  });
   
   function updateDisplay() {
     const num = parseFloat(currentDisplay || '0');
@@ -150,19 +183,15 @@ export async function renderEntrada(container) {
     aiLoading.style.display = 'block';
     
     try {
-      const data = await scanReceipt();
+      // Dummy image string for the demo, in a real app this opens a camera
+      const data = await scanReceipt("dummy_base64_image");
       
-      // Fill data
       currentDisplay = data.valor_total.toString();
       updateDisplay();
-      
       inputDesc.value = data.estabelecimento;
       
-      // Find category ID by name
       const cat = categorias.find(c => c.nome.toLowerCase() === data.categoria_sugerida.toLowerCase());
-      if (cat) {
-        selectCat.value = cat.id;
-      }
+      if (cat) selectCat.value = cat.id;
       
     } catch (e) {
       alert("Erro ao processar imagem");
@@ -184,20 +213,70 @@ export async function renderEntrada(container) {
       return;
     }
     
-    const today = new Date().toISOString().split('T')[0];
+    const selectedDate = new Date(inputDate.value);
+    const today = new Date();
+    // Reset hours to compare dates only
+    today.setHours(0,0,0,0);
+    // Adjust selected date due to timezone issues with value string
+    const targetDate = new Date(selectedDate.getTime() + selectedDate.getTimezoneOffset() * 60000);
     
-    await db.insert('lancamentos_mes', {
-      valor: val,
-      data_vencimento: today,
-      categoria_id: parseInt(selectCat.value),
-      descricao_custom: inputDesc.value.trim(),
-      tipo_lancamento: 'DESPESA_VARIAVEL',
-      pago_por: selectPayer.value,
-      regra_divisao: selectSplit.value,
-      status: 'PAGO' // New custom transactions are usually paid instantly
-    });
+    const isFuture = targetDate > today;
+    const status = isFuture ? 'PENDENTE' : 'PAGO';
     
-    // Reset and navigate back
+    if (selectRepeat.value === 'recorrente') {
+      // Salva como despesa fixa na tabela de configurações para os meses seguintes
+      await db.insert('despesas_fixas', {
+        categoria_id: parseInt(selectCat.value),
+        descricao: inputDesc.value.trim(),
+        valor_estimado: val,
+        dia_vencimento: targetDate.getDate(),
+        regra_divisao: selectSplit.value,
+        pago_por_padrao: selectPayer.value
+      });
+      // Também gera o lançamento do mês atual
+      await db.insert('lancamentos_mes', {
+        valor: val,
+        data_vencimento: inputDate.value,
+        categoria_id: parseInt(selectCat.value),
+        descricao_custom: inputDesc.value.trim(),
+        tipo_lancamento: 'DESPESA_FIXA',
+        pago_por: selectPayer.value,
+        regra_divisao: selectSplit.value,
+        status: status
+      });
+    } else if (selectRepeat.value === 'parcelada') {
+      const numParcelas = parseInt(inputParcelas.value) || 2;
+      for (let i = 0; i < numParcelas; i++) {
+        const d = new Date(targetDate);
+        d.setMonth(d.getMonth() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        const isFutureParc = d > today;
+        
+        await db.insert('lancamentos_mes', {
+          valor: val,
+          data_vencimento: dateStr,
+          categoria_id: parseInt(selectCat.value),
+          descricao_custom: `${inputDesc.value.trim()} (${i+1}/${numParcelas})`,
+          tipo_lancamento: 'DESPESA_VARIAVEL',
+          pago_por: selectPayer.value,
+          regra_divisao: selectSplit.value,
+          status: isFutureParc ? 'PENDENTE' : 'PAGO'
+        });
+      }
+    } else {
+      // Única
+      await db.insert('lancamentos_mes', {
+        valor: val,
+        data_vencimento: inputDate.value,
+        categoria_id: parseInt(selectCat.value),
+        descricao_custom: inputDesc.value.trim(),
+        tipo_lancamento: 'DESPESA_VARIAVEL',
+        pago_por: selectPayer.value,
+        regra_divisao: selectSplit.value,
+        status: status
+      });
+    }
+    
     currentDisplay = '0';
     navigate('dashboard');
   });
