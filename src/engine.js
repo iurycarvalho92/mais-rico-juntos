@@ -17,9 +17,13 @@ export async function runRecurrenceEngine() {
   const receitas = await db.getTable('receitas_fixas');
   const despesas = await db.getTable('despesas_fixas');
   
+  const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+  
   // 1. Process Receitas Fixas
   for (const r of receitas) {
-    const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(r.dia_recebimento).padStart(2, '0')}`;
+    if (r.ultimo_mes_gerado === currentMonthStr) continue;
+    
+    const dataVencimento = `${currentMonthStr}-${String(r.dia_recebimento).padStart(2, '0')}`;
     
     await db.insert('lancamentos_mes', {
       valor: r.valor_estimado,
@@ -31,11 +35,15 @@ export async function runRecurrenceEngine() {
       regra_divisao: 'INDIVIDUAL',
       status: 'PENDENTE'
     });
+    
+    await db.update('receitas_fixas', r.id, { ultimo_mes_gerado: currentMonthStr });
   }
   
   // 2. Process Despesas Fixas
   for (const d of despesas) {
-    const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d.dia_vencimento).padStart(2, '0')}`;
+    if (d.ultimo_mes_gerado === currentMonthStr) continue;
+    
+    const dataVencimento = `${currentMonthStr}-${String(d.dia_vencimento).padStart(2, '0')}`;
     
     await db.insert('lancamentos_mes', {
       valor: d.valor_estimado,
@@ -48,6 +56,8 @@ export async function runRecurrenceEngine() {
       regra_divisao_percent: d.regra_divisao_percent !== undefined ? d.regra_divisao_percent : 50, // default 50/50 if missing
       status: 'PENDENTE'
     });
+    
+    await db.update('despesas_fixas', d.id, { ultimo_mes_gerado: currentMonthStr });
   }
   
   localStorage.setItem(runKey, 'true');

@@ -125,12 +125,20 @@ export async function renderConfiguracoes(container) {
     const user = document.getElementById('rec-user').value;
     
     if (desc && val > 0 && dia >= 1 && dia <= 31) {
-      await db.insert('receitas_fixas', { descricao: desc, valor_estimado: val, dia_recebimento: dia, utilizador_id: user });
-      
-      // Criar também a instância deste mês automaticamente
       const currentYear = new Date().getFullYear();
       const currentMonth = new Date().getMonth() + 1;
-      const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+      const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      
+      await db.insert('receitas_fixas', { 
+        descricao: desc, 
+        valor_estimado: val, 
+        dia_recebimento: dia, 
+        utilizador_id: user,
+        ultimo_mes_gerado: currentMonthStr
+      });
+      
+      // Criar também a instância deste mês automaticamente
+      const dataVencimento = `${currentMonthStr}-${String(dia).padStart(2, '0')}`;
       
       await db.insert('lancamentos_mes', {
         valor: val,
@@ -156,15 +164,18 @@ export async function renderConfiguracoes(container) {
     const split = document.getElementById('des-split').value;
     
     if (desc && val > 0 && dia >= 1 && dia <= 31) {
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth() + 1;
+      const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      
       await db.insert('despesas_fixas', { 
         descricao: desc, valor_estimado: val, dia_vencimento: dia, 
-        categoria_id: parseInt(cat), pago_por_padrao: user, regra_divisao_percent: parseInt(split) 
+        categoria_id: parseInt(cat), pago_por_padrao: user, regra_divisao_percent: parseInt(split),
+        ultimo_mes_gerado: currentMonthStr
       });
       
       // Criar também a instância deste mês automaticamente para atualizar o Resumo
-      const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth() + 1;
-      const dataVencimento = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+      const dataVencimento = `${currentMonthStr}-${String(dia).padStart(2, '0')}`;
       
       await db.insert('lancamentos_mes', {
         valor: val,
