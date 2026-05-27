@@ -22,8 +22,6 @@ const AUTHORIZED_EMAILS = [
 ];
 
 function isAuthorized(email) {
-  // Para testes durante desenvolvimento, pode retornar true
-  // return true; 
   return AUTHORIZED_EMAILS.includes(email.toLowerCase());
 }
 
@@ -44,83 +42,107 @@ async function renderLogin() {
       </button>
       
       <div id="login-error" style="color: var(--danger-color); margin-top: 20px; display: none;"></div>
+      <div id="login-debug" style="color: var(--text-secondary); margin-top: 10px; font-size: 0.7rem; display: none;"></div>
     </div>
   `;
 
   document.getElementById('btn-login').addEventListener('click', async () => {
+    const errDiv = document.getElementById('login-error');
+    const debugDiv = document.getElementById('login-debug');
+    errDiv.style.display = 'none';
+    
     try {
+      console.log('[Auth] Starting Google Sign-In...');
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      console.log('[Auth] Signed in as:', user.email);
       
       if (!isAuthorized(user.email)) {
         await signOut(auth);
-        const errDiv = document.getElementById('login-error');
         errDiv.textContent = 'Acesso Negado: E-mail não autorizado para este cofre.';
         errDiv.style.display = 'block';
-      } else {
-        window.location.reload(); // Reload to mount app properly
       }
+      // If authorized, onAuthStateChanged will handle the rest
     } catch (error) {
-      console.error(error);
-      const errDiv = document.getElementById('login-error');
-      errDiv.textContent = 'Erro ao fazer login: ' + error.message;
+      console.error('[Auth] Login error:', error);
+      errDiv.textContent = 'Erro ao fazer login. Verifique o console do navegador.';
       errDiv.style.display = 'block';
+      debugDiv.textContent = error.code + ': ' + error.message;
+      debugDiv.style.display = 'block';
     }
   });
 }
 
 // Check auth state
 auth.onAuthStateChanged(async (user) => {
+  console.log('[Auth] State changed:', user ? user.email : 'not logged in');
+  
   if (user && isAuthorized(user.email)) {
-    // Inject original HTML structure back since we overwrote appContainer
-    // Sync user profile name with DB
-    await syncUserProfile(user);
+    try {
+      // Sync user profile name with DB
+      await syncUserProfile(user);
 
-    DOM.appContainer.innerHTML = `
-      <header class="app-header">
-        <h1 id="screen-title">Resumo</h1>
-        <div class="user-avatars" id="header-avatars"></div>
-      </header>
-      <main id="main-content" class="screen-content"></main>
-      <nav class="bottom-nav">
-        <button class="nav-item active" data-target="dashboard">
-          <span class="icon">📊</span>
-          <span>Resumo</span>
-        </button>
-        <button class="nav-item fab-wrapper" data-target="entrada">
-          <div class="fab"><span class="icon">+</span></div>
-        </button>
-        <button class="nav-item" data-target="planejamento">
-          <span class="icon">🎯</span>
-          <span>Metas</span>
-        </button>
-        <button class="nav-item" data-target="extrato">
-          <span class="icon">📋</span>
-          <span>Extrato</span>
-        </button>
-        <button class="nav-item" data-target="configuracoes">
-          <span class="icon">⚙️</span>
-          <span>Config</span>
-        </button>
-      </nav>
-    `;
-    
-    // Re-bind DOM elements after injection
-    DOM.mainContent = document.getElementById('main-content');
-    DOM.screenTitle = document.getElementById('screen-title');
-    DOM.navItems = document.querySelectorAll('.nav-item');
-    DOM.headerAvatars = document.getElementById('header-avatars');
-    
-    await initApp();
+      DOM.appContainer.innerHTML = `
+        <header class="app-header">
+          <h1 id="screen-title">Resumo</h1>
+          <div class="user-avatars" id="header-avatars"></div>
+        </header>
+        <main id="main-content" class="screen-content">
+          <div style="text-align: center; padding: 40px;">Carregando dados...</div>
+        </main>
+        <nav class="bottom-nav">
+          <button class="nav-item active" data-target="dashboard">
+            <span class="icon">📊</span>
+            <span>Resumo</span>
+          </button>
+          <button class="nav-item fab-wrapper" data-target="entrada">
+            <div class="fab"><span class="icon">+</span></div>
+          </button>
+          <button class="nav-item" data-target="planejamento">
+            <span class="icon">🎯</span>
+            <span>Metas</span>
+          </button>
+          <button class="nav-item" data-target="extrato">
+            <span class="icon">📋</span>
+            <span>Extrato</span>
+          </button>
+          <button class="nav-item" data-target="configuracoes">
+            <span class="icon">⚙️</span>
+            <span>Config</span>
+          </button>
+        </nav>
+      `;
+      
+      // Re-bind DOM elements after injection
+      DOM.mainContent = document.getElementById('main-content');
+      DOM.screenTitle = document.getElementById('screen-title');
+      DOM.navItems = document.querySelectorAll('.nav-item');
+      DOM.headerAvatars = document.getElementById('header-avatars');
+      
+      await initApp();
+    } catch (error) {
+      console.error('[App] Init error:', error);
+      DOM.appContainer.innerHTML = `
+        <div style="padding: 40px; text-align: center; color: var(--danger-color);">
+          <h2>Erro ao carregar a aplicação</h2>
+          <p style="margin-top: 10px; color: var(--text-secondary);">${error.message}</p>
+          <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 20px;">Tentar Novamente</button>
+        </div>
+      `;
+    }
   } else {
     renderLogin();
   }
 });
 
 async function initApp() {
+  console.log('[App] Initializing...');
   await db.init();
+  console.log('[App] DB initialized');
   await runRecurrenceEngine();
+  console.log('[App] Engine ran');
   await renderAvatars();
+  console.log('[App] Avatars rendered');
   
   // Set up navigation
   DOM.navItems.forEach(btn => {
@@ -132,10 +154,15 @@ async function initApp() {
 
   // Load default screen
   navigate('dashboard');
+  console.log('[App] Ready!');
 }
 
 async function renderAvatars() {
   const users = await db.getTable('utilizadores');
+  if (!users || users.length === 0) {
+    DOM.headerAvatars.innerHTML = '';
+    return;
+  }
   DOM.headerAvatars.innerHTML = users.map(u => 
     `<div class="avatar" style="background-color: ${u.cor_avatar}">${u.nome.charAt(0)}</div>`
   ).join('');
@@ -176,5 +203,28 @@ export function navigate(screen) {
       DOM.screenTitle.textContent = 'Configurações';
       renderConfiguracoes(DOM.mainContent);
       break;
+  }
+}
+
+async function syncUserProfile(user) {
+  try {
+    const users = await db.getTable('utilizadores');
+    const existingUser = users.find(u => u.email === user.email);
+    
+    if (existingUser) {
+      if (existingUser.nome !== user.displayName) {
+        await db.update('utilizadores', existingUser.id, { nome: user.displayName });
+      }
+    } else {
+      const isUser1 = user.email.toLowerCase() === AUTHORIZED_EMAILS[0].toLowerCase();
+      await db.insert('utilizadores', {
+        id: isUser1 ? 'u1' : 'u2',
+        nome: user.displayName || (isUser1 ? 'Iury' : 'Giulia'),
+        cor_avatar: isUser1 ? '#3b82f6' : '#ec4899',
+        email: user.email
+      });
+    }
+  } catch (e) {
+    console.warn('[App] syncUserProfile error (non-fatal):', e);
   }
 }
