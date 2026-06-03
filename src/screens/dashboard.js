@@ -39,26 +39,26 @@ export async function renderDashboard(container) {
         if (l.tipo_lancamento === 'RECEITA') receitasPrevistas += val;
         else if (l.tipo_lancamento === 'DESPESA_FIXA') custosFixos += val;
         else gastoVariavel += val;
+      }
+      
+      // Balance Logic (ALL TIME) - Somente efetivados (PAGOS) contam para quem deve a quem
+      if (l.tipo_lancamento !== 'RECEITA' && l.status === 'PAGO') {
+        let u1Share = 0; let u2Share = 0;
         
-        // Balance Logic (Current Month) - Somente efetivados (PAGOS) contam para quem deve a quem
-        if (l.tipo_lancamento !== 'RECEITA' && l.status === 'PAGO') {
-          let u1Share = 0; let u2Share = 0;
-          
-          if (l.regra_divisao_percent !== undefined) {
-             const p2 = parseInt(l.regra_divisao_percent);
-             const p1 = 100 - p2;
-             u1Share = val * (p1 / 100);
-             u2Share = val * (p2 / 100);
-          } else {
-            // Fallback old rules
-            if (l.regra_divisao === '50_50') { u1Share = val / 2; u2Share = val / 2; }
-            else if (l.regra_divisao === '100_USER_A') u1Share = val;
-            else if (l.regra_divisao === '100_USER_B') u2Share = val;
-          }
-          
-          if (l.pago_por === u1Id) u1Balance += u2Share;
-          else if (l.pago_por === u2Id) u1Balance -= u1Share;
+        if (l.regra_divisao_percent !== undefined) {
+           const p2 = parseInt(l.regra_divisao_percent);
+           const p1 = 100 - p2;
+           u1Share = val * (p1 / 100);
+           u2Share = val * (p2 / 100);
+        } else {
+          // Fallback old rules
+          if (l.regra_divisao === '50_50') { u1Share = val / 2; u2Share = val / 2; }
+          else if (l.regra_divisao === '100_USER_A') u1Share = val;
+          else if (l.regra_divisao === '100_USER_B') u2Share = val;
         }
+        
+        if (l.pago_por === u1Id) u1Balance += u2Share;
+        else if (l.pago_por === u2Id) u1Balance -= u1Share;
       }
       
       // Check for reminders (Pending and within 5 days)
@@ -165,7 +165,7 @@ export async function renderDashboard(container) {
       <!-- Balance Panel -->
       <div class="card" style="text-align: center; border-color: ${balanceColor};">
         <h3 style="color: ${balanceColor};">${balanceText}</h3>
-        <p class="text-muted" style="font-size: 0.85rem; margin-top: 5px;">Acerto de contas dinâmico do mês atual</p>
+        <p class="text-muted" style="font-size: 0.85rem; margin-top: 5px;">Acerto de contas geral (acumulado)</p>
       </div>
       
       <!-- Executive Summary -->
