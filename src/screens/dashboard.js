@@ -24,6 +24,10 @@ export async function renderDashboard(container) {
     const u1Id = users[0].id;
     const u2Id = users[1].id;
     
+    let gastoU1 = 0;
+    let gastoU2 = 0;
+    let pendenciasAnteriores = 0;
+    
     const currentDate = new Date();
     currentDate.setHours(0,0,0,0);
     const currentMonthStr = currentDate.toISOString().slice(0, 7); // YYYY-MM
@@ -34,11 +38,32 @@ export async function renderDashboard(container) {
     for (const l of lancamentos) {
       const val = parseFloat(l.valor);
       
+      // Check for past pendencies (older than current month)
+      if (l.status === 'PENDENTE' && l.tipo_lancamento !== 'RECEITA' && l.data_vencimento < currentMonthStr + "-00") {
+        pendenciasAnteriores += val;
+      }
+      
       // Calculate only for current month for the summary cards
       if (l.data_vencimento.startsWith(currentMonthStr)) {
         if (l.tipo_lancamento === 'RECEITA') receitasPrevistas += val;
         else if (l.tipo_lancamento === 'DESPESA_FIXA') custosFixos += val;
-        else gastoVariavel += val;
+        else if (l.tipo_lancamento !== 'TRANSFERENCIA') gastoVariavel += val;
+        
+        // Calculate Gasto Individual (Cota-parte) this month
+        if (l.tipo_lancamento !== 'RECEITA' && l.tipo_lancamento !== 'TRANSFERENCIA') {
+          let u1S = 0; let u2S = 0;
+          if (l.regra_divisao_percent !== undefined) {
+             const p2 = parseInt(l.regra_divisao_percent);
+             const p1 = 100 - p2;
+             u1S = val * (p1 / 100);
+             u2S = val * (p2 / 100);
+          } else {
+            // fallback
+            u1S = val/2; u2S = val/2;
+          }
+          gastoU1 += u1S;
+          gastoU2 += u2S;
+        }
       }
       
       // Balance Logic (ALL TIME) - Somente efetivados (PAGOS) contam para quem deve a quem
@@ -77,7 +102,7 @@ export async function renderDashboard(container) {
     // Calculate Category Breakdown (Current month expenses)
     const categoryBreakdown = {};
     for (const l of lancamentos) {
-      if (l.data_vencimento.startsWith(currentMonthStr) && l.tipo_lancamento !== 'RECEITA') {
+      if (l.data_vencimento.startsWith(currentMonthStr) && l.tipo_lancamento !== 'RECEITA' && l.tipo_lancamento !== 'TRANSFERENCIA') {
         const catId = l.categoria_id;
         if (!categoryBreakdown[catId]) categoryBreakdown[catId] = 0;
         categoryBreakdown[catId] += parseFloat(l.valor);
@@ -166,6 +191,9 @@ export async function renderDashboard(container) {
       <div class="card" style="text-align: center; border-color: ${balanceColor};">
         <h3 style="color: ${balanceColor};">${balanceText}</h3>
         <p class="text-muted" style="font-size: 0.85rem; margin-top: 5px;">Acerto de contas geral (acumulado)</p>
+        ${Math.abs(u1Balance) > 0.01 ? `
+          <button id="btn-quitar" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; width: auto; display: inline-block;">🤝 Quitar / Abater Dívida</button>
+        ` : ''}
       </div>
       
       <!-- Executive Summary -->
@@ -185,6 +213,30 @@ export async function renderDashboard(container) {
         <div class="card" style="margin:0; padding: 12px; background: rgba(99, 102, 241, 0.1); border-color: var(--primary-color);">
           <div style="font-size: 0.75rem; color: var(--primary-hover)">Livre (Mês)</div>
           <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary-color)">${f.format(dinheiroLivre)}</div>
+        </div>
+      </div>
+      
+      <!-- Contribution & Pendency -->
+      <div style="margin-bottom: 20px;">
+        ${pendenciasAnteriores > 0 ? `
+          <div class="card" style="background: rgba(239, 68, 68, 0.1); border-color: var(--danger-color); padding: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: var(--danger-color); font-weight: 600;">⚠️ Contas Atrasadas (Meses Anteriores)</div>
+            <div style="color: var(--danger-color); font-weight: 700; font-size: 1.1rem;">${f.format(pendenciasAnteriores)}</div>
+          </div>
+        ` : ''}
+        
+        <div class="card" style="padding: 15px; margin: 0;">
+          <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">Cota-parte das Despesas (Este Mês)</h3>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px;">
+            <div style="font-weight: 600; color: var(--primary-color);">${users[0].nome} (${f.format(gastoU1)})</div>
+            <div style="font-weight: 600; color: var(--success-color);">${users[1].nome} (${f.format(gastoU2)})</div>
+          </div>
+          
+          <div style="width: 100%; height: 12px; background: var(--bg-color); border-radius: 6px; overflow: hidden; display: flex;">
+            <div style="height: 100%; width: ${(gastoU1 / (gastoU1 + gastoU2 || 1)) * 100}%; background: var(--primary-color);"></div>
+            <div style="height: 100%; width: ${(gastoU2 / (gastoU1 + gastoU2 || 1)) * 100}%; background: var(--success-color);"></div>
+          </div>
         </div>
       </div>
       
@@ -304,6 +356,40 @@ export async function renderDashboard(container) {
         }
       });
     });
+    
+    // Quitar Contas Listener
+    const btnQuitar = document.getElementById('btn-quitar');
+    if (btnQuitar) {
+      btnQuitar.addEventListener('click', async () => {
+        const absBalance = Math.abs(u1Balance);
+        const devedor = u1Balance > 0 ? users[1] : users[0];
+        const credor = u1Balance > 0 ? users[0] : users[1];
+        
+        const valorStr = prompt(`💸 ${devedor.nome} deve a ${credor.nome}.\nInsira o valor que foi pago para abater a dívida (parcial ou total):`, absBalance.toFixed(2));
+        
+        if (valorStr !== null) {
+          let valorPago = parseFloat(valorStr.replace(',', '.'));
+          if (!isNaN(valorPago) && valorPago > 0) {
+            const regraPercent = (credor.id === users[1].id) ? 100 : 0; 
+            
+            await db.insert('lancamentos_mes', {
+              valor: valorPago,
+              data_vencimento: new Date().toISOString().split('T')[0],
+              categoria_id: null,
+              descricao_custom: 'Acerto de Contas / Transferência',
+              tipo_lancamento: 'TRANSFERENCIA',
+              pago_por: devedor.id,
+              regra_divisao_percent: regraPercent,
+              status: 'PAGO'
+            });
+            
+            render();
+          } else {
+            alert('Valor inválido!');
+          }
+        }
+      });
+    }
   }
 
   await render();

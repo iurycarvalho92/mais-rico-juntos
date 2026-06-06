@@ -283,6 +283,7 @@ export async function renderEntrada(container) {
       });
     } else if (selectRepeat.value === 'parcelada') {
       const numParcelas = parseInt(inputParcelas.value) || 2;
+      const valParcela = val / numParcelas;
       for (let i = 0; i < numParcelas; i++) {
         const d = new Date(targetDate);
         d.setMonth(d.getMonth() + i);
@@ -290,7 +291,8 @@ export async function renderEntrada(container) {
         const isFutureParc = d > today;
         
         await db.insert('lancamentos_mes', {
-          valor: val,
+          valor: valParcela,
+          valor_total: val,
           data_vencimento: dateStr,
           categoria_id: parseInt(selectCat.value),
           descricao_custom: `${inputDesc.value.trim()} (${i+1}/${numParcelas})`,
