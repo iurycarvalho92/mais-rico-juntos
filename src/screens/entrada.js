@@ -260,63 +260,67 @@ export async function renderEntrada(container) {
     const isFuture = targetDate > today;
     const status = isFuture ? 'PENDENTE' : 'PAGO';
     
-    if (selectRepeat.value === 'recorrente') {
-      // Salva como despesa fixa na tabela de configurações para os meses seguintes
-      await db.insert('despesas_fixas', {
-        categoria_id: parseInt(selectCat.value),
-        descricao: inputDesc.value.trim(),
-        valor_estimado: val,
-        dia_vencimento: targetDate.getDate(),
-        regra_divisao_percent: parseInt(splitSlider.value),
-        pago_por_padrao: selectPayer.value
-      });
-      // Também gera o lançamento do mês atual
-      await db.insert('lancamentos_mes', {
-        valor: val,
-        data_vencimento: inputDate.value,
-        categoria_id: parseInt(selectCat.value),
-        descricao_custom: inputDesc.value.trim(),
-        tipo_lancamento: 'DESPESA_FIXA',
-        pago_por: selectPayer.value,
-        regra_divisao_percent: parseInt(splitSlider.value),
-        status: status
-      });
-    } else if (selectRepeat.value === 'parcelada') {
-      const numParcelas = parseInt(inputParcelas.value) || 2;
-      const valParcela = val / numParcelas;
-      for (let i = 0; i < numParcelas; i++) {
-        const d = new Date(targetDate);
-        d.setMonth(d.getMonth() + i);
-        const dateStr = d.toISOString().split('T')[0];
-        const isFutureParc = d > today;
-        
-        await db.insert('lancamentos_mes', {
-          valor: valParcela,
-          valor_total: val,
-          data_vencimento: dateStr,
+    try {
+      if (selectRepeat.value === 'recorrente') {
+        // Salva como despesa fixa na tabela de configurações para os meses seguintes
+        await db.insert('despesas_fixas', {
           categoria_id: parseInt(selectCat.value),
-          descricao_custom: `${inputDesc.value.trim()} (${i+1}/${numParcelas})`,
+          descricao: inputDesc.value.trim(),
+          valor_estimado: val,
+          dia_vencimento: targetDate.getDate(),
+          regra_divisao_percent: parseInt(splitSlider.value),
+          pago_por_padrao: selectPayer.value
+        });
+        // Também gera o lançamento do mês atual
+        await db.insert('lancamentos_mes', {
+          valor: val,
+          data_vencimento: inputDate.value,
+          categoria_id: parseInt(selectCat.value),
+          descricao_custom: inputDesc.value.trim(),
+          tipo_lancamento: 'DESPESA_FIXA',
+          pago_por: selectPayer.value,
+          regra_divisao_percent: parseInt(splitSlider.value),
+          status: status
+        });
+      } else if (selectRepeat.value === 'parcelada') {
+        const numParcelas = parseInt(inputParcelas.value) || 2;
+        const valParcela = val / numParcelas;
+        for (let i = 0; i < numParcelas; i++) {
+          const d = new Date(targetDate);
+          d.setMonth(d.getMonth() + i);
+          const dateStr = d.toISOString().split('T')[0];
+          const isFutureParc = d > today;
+          
+          await db.insert('lancamentos_mes', {
+            valor: valParcela,
+            valor_total: val,
+            data_vencimento: dateStr,
+            categoria_id: parseInt(selectCat.value),
+            descricao_custom: `${inputDesc.value.trim()} (${i+1}/${numParcelas})`,
+            tipo_lancamento: 'DESPESA_VARIAVEL',
+            pago_por: selectPayer.value,
+            regra_divisao_percent: parseInt(splitSlider.value),
+            status: isFutureParc ? 'PENDENTE' : 'PAGO'
+          });
+        }
+      } else {
+        // Única
+        await db.insert('lancamentos_mes', {
+          valor: val,
+          data_vencimento: inputDate.value,
+          categoria_id: parseInt(selectCat.value),
+          descricao_custom: inputDesc.value.trim(),
           tipo_lancamento: 'DESPESA_VARIAVEL',
           pago_por: selectPayer.value,
           regra_divisao_percent: parseInt(splitSlider.value),
-          status: isFutureParc ? 'PENDENTE' : 'PAGO'
+          status: status
         });
       }
-    } else {
-      // Única
-      await db.insert('lancamentos_mes', {
-        valor: val,
-        data_vencimento: inputDate.value,
-        categoria_id: parseInt(selectCat.value),
-        descricao_custom: inputDesc.value.trim(),
-        tipo_lancamento: 'DESPESA_VARIAVEL',
-        pago_por: selectPayer.value,
-        regra_divisao_percent: parseInt(splitSlider.value),
-        status: status
-      });
+      currentDisplay = '0';
+      navigate('dashboard');
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao salvar: " + err.message);
     }
-    
-    currentDisplay = '0';
-    navigate('dashboard');
   });
 }

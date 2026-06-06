@@ -54,6 +54,31 @@ export const db = {
       console.error("Error initializing DB:", e);
     }
     
+    // Migration: Fix old installments that have description ending with (X/Y) but no valor_total
+    try {
+      const lancamentos = await getDocs(collection(firestore, 'lancamentos_mes'));
+      for (const d of lancamentos.docs) {
+        const data = d.data();
+        if (data.tipo_lancamento === 'DESPESA_VARIAVEL' && data.valor_total === undefined && typeof data.descricao_custom === 'string') {
+          const match = data.descricao_custom.match(/\((\d+)\/(\d+)\)$/);
+          if (match) {
+            const numParcelas = parseInt(match[2]);
+            if (numParcelas > 1) {
+              const valorAntigo = parseFloat(data.valor);
+              const newVal = valorAntigo / numParcelas;
+              await updateDoc(d.ref, {
+                valor: newVal,
+                valor_total: valorAntigo
+              });
+              console.log(`Migrated installment: ${data.descricao_custom}`);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Migration error:", e);
+    }
+    
     // Always force sync categories to ensure updates propagate to existing databases
     await this.syncCategorias();
   },

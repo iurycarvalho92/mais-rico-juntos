@@ -319,9 +319,14 @@ export async function renderExtrato(container) {
           }
           
           if (updates.descricao_custom && !isNaN(updates.valor) && updates.valor > 0) {
-            await db.update('lancamentos_mes', id, updates);
-            modalContainer.innerHTML = '';
-            render();
+            try {
+              await db.update('lancamentos_mes', id, updates);
+              modalContainer.innerHTML = '';
+              render();
+            } catch (err) {
+              console.error(err);
+              alert("Erro ao editar: " + err.message);
+            }
           } else {
             alert("Preencha os campos corretamente.");
           }
