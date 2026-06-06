@@ -45,20 +45,14 @@ export async function renderDashboard(container) {
         pendenciasAnteriores += val;
       }
       
-      // Check for future commitments (cota-parte futura)
+      // Check for future commitments (quem vai pagar fisicamente)
       const isFutureMonth = l.data_vencimento.substring(0, 7) > currentMonthStr;
       if (l.status === 'PENDENTE' && l.tipo_lancamento !== 'RECEITA' && l.tipo_lancamento !== 'TRANSFERENCIA' && isFutureMonth) {
-        let u1S = 0; let u2S = 0;
-        if (l.regra_divisao_percent !== undefined) {
-           const p2 = parseInt(l.regra_divisao_percent);
-           const p1 = 100 - p2;
-           u1S = val * (p1 / 100);
-           u2S = val * (p2 / 100);
-        } else {
-           u1S = val/2; u2S = val/2;
+        if (l.pago_por === u1Id) {
+          futuroU1 += val;
+        } else if (l.pago_por === u2Id) {
+          futuroU2 += val;
         }
-        futuroU1 += u1S;
-        futuroU2 += u2S;
       }
       
       // Calculate only for current month for the summary cards
@@ -251,7 +245,7 @@ export async function renderDashboard(container) {
         </div>
         
         <div class="card" style="padding: 15px; margin: 15px 0 0 0;">
-          <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">Compromissos Futuros (Cota-parte de Parcelas)</h3>
+          <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">Compromissos Futuros (Quem Vai Pagar)</h3>
           
           <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px;">
             <div style="font-weight: 600; color: var(--primary-color);">${users[0].nome} (${f.format(futuroU1)})</div>
