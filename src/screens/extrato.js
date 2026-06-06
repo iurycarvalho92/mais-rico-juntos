@@ -134,8 +134,9 @@ export async function renderExtrato(container) {
                     ${sign} ${f.format(l.valor)}
                   </div>
                   ${l.valor_total ? `
-                    <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px;">
-                      (Total: ${f.format(l.valor_total)})
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
+                      Parcela Mês: ${f.format(l.valor)}<br>
+                      Compra Total: ${f.format(l.valor_total)}
                     </div>
                   ` : ''}
                   <div style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); display: inline-block; margin-top: 4px; color: ${l.status === 'PENDENTE' ? 'var(--warning-color)' : 'var(--success-color)'}">

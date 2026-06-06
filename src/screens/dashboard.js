@@ -49,20 +49,13 @@ export async function renderDashboard(container) {
         else if (l.tipo_lancamento === 'DESPESA_FIXA') custosFixos += val;
         else if (l.tipo_lancamento !== 'TRANSFERENCIA') gastoVariavel += val;
         
-        // Calculate Gasto Individual (Cota-parte) this month
+        // Calculate Gasto Individual (Quem pagou fisicamente) this month
         if (l.tipo_lancamento !== 'RECEITA' && l.tipo_lancamento !== 'TRANSFERENCIA') {
-          let u1S = 0; let u2S = 0;
-          if (l.regra_divisao_percent !== undefined) {
-             const p2 = parseInt(l.regra_divisao_percent);
-             const p1 = 100 - p2;
-             u1S = val * (p1 / 100);
-             u2S = val * (p2 / 100);
-          } else {
-            // fallback
-            u1S = val/2; u2S = val/2;
+          if (l.pago_por === u1Id) {
+            gastoU1 += val;
+          } else if (l.pago_por === u2Id) {
+            gastoU2 += val;
           }
-          gastoU1 += u1S;
-          gastoU2 += u2S;
         }
       }
       
@@ -226,7 +219,7 @@ export async function renderDashboard(container) {
         ` : ''}
         
         <div class="card" style="padding: 15px; margin: 0;">
-          <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">Cota-parte das Despesas (Este Mês)</h3>
+          <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">Quem Pagou Mais Este Mês (Tirou do Bolso)</h3>
           
           <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px;">
             <div style="font-weight: 600; color: var(--primary-color);">${users[0].nome} (${f.format(gastoU1)})</div>
