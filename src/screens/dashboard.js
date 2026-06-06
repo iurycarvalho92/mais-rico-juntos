@@ -27,6 +27,8 @@ export async function renderDashboard(container) {
     let gastoU1 = 0;
     let gastoU2 = 0;
     let pendenciasAnteriores = 0;
+    let futuroU1 = 0;
+    let futuroU2 = 0;
     
     const currentDate = new Date();
     currentDate.setHours(0,0,0,0);
@@ -41,6 +43,22 @@ export async function renderDashboard(container) {
       // Check for past pendencies (older than current month)
       if (l.status === 'PENDENTE' && l.tipo_lancamento !== 'RECEITA' && l.data_vencimento < currentMonthStr + "-00") {
         pendenciasAnteriores += val;
+      }
+      
+      // Check for future commitments (cota-parte futura)
+      const isFutureMonth = l.data_vencimento.substring(0, 7) > currentMonthStr;
+      if (l.status === 'PENDENTE' && l.tipo_lancamento !== 'RECEITA' && l.tipo_lancamento !== 'TRANSFERENCIA' && isFutureMonth) {
+        let u1S = 0; let u2S = 0;
+        if (l.regra_divisao_percent !== undefined) {
+           const p2 = parseInt(l.regra_divisao_percent);
+           const p1 = 100 - p2;
+           u1S = val * (p1 / 100);
+           u2S = val * (p2 / 100);
+        } else {
+           u1S = val/2; u2S = val/2;
+        }
+        futuroU1 += u1S;
+        futuroU2 += u2S;
       }
       
       // Calculate only for current month for the summary cards
@@ -229,6 +247,20 @@ export async function renderDashboard(container) {
           <div style="width: 100%; height: 12px; background: var(--bg-color); border-radius: 6px; overflow: hidden; display: flex;">
             <div style="height: 100%; width: ${(gastoU1 / (gastoU1 + gastoU2 || 1)) * 100}%; background: var(--primary-color);"></div>
             <div style="height: 100%; width: ${(gastoU2 / (gastoU1 + gastoU2 || 1)) * 100}%; background: var(--success-color);"></div>
+          </div>
+        </div>
+        
+        <div class="card" style="padding: 15px; margin: 15px 0 0 0;">
+          <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px;">Compromissos Futuros (Cota-parte de Parcelas)</h3>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px;">
+            <div style="font-weight: 600; color: var(--primary-color);">${users[0].nome} (${f.format(futuroU1)})</div>
+            <div style="font-weight: 600; color: var(--success-color);">${users[1].nome} (${f.format(futuroU2)})</div>
+          </div>
+          
+          <div style="width: 100%; height: 12px; background: var(--bg-color); border-radius: 6px; overflow: hidden; display: flex;">
+            <div style="height: 100%; width: ${(futuroU1 / (futuroU1 + futuroU2 || 1)) * 100}%; background: var(--primary-color); opacity: 0.8;"></div>
+            <div style="height: 100%; width: ${(futuroU2 / (futuroU1 + futuroU2 || 1)) * 100}%; background: var(--success-color); opacity: 0.8;"></div>
           </div>
         </div>
       </div>
