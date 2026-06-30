@@ -267,18 +267,20 @@ export async function renderDashboard(container) {
           ${sortedCategories.map(c => {
              const percentage = ((c.total / (custosFixos + gastoVariavel)) * 100).toFixed(1);
              return `
-               <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                 <div style="display: flex; align-items: center; gap: 8px;">
-                   <span style="font-size: 1.1rem;">${c.cat?.icone || '❓'}</span>
-                   <span>${c.cat?.nome || 'Sem Categoria'}</span>
+               <div class="category-item" data-id="${c.cat?.id}" style="cursor: pointer; padding: 4px; border-radius: 4px; transition: background 0.2s;">
+                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+                   <div style="display: flex; align-items: center; gap: 8px;">
+                     <span style="font-size: 1.1rem;">${c.cat?.icone || '❓'}</span>
+                     <span>${c.cat?.nome || 'Sem Categoria'}</span>
+                   </div>
+                   <div style="display: flex; align-items: center; gap: 10px;">
+                     <span style="font-weight: 600;">${f.format(c.total)}</span>
+                     <span style="color: var(--text-secondary); font-size: 0.75rem; width: 35px; text-align: right;">${percentage}%</span>
+                   </div>
                  </div>
-                 <div style="display: flex; align-items: center; gap: 10px;">
-                   <span style="font-weight: 600;">${f.format(c.total)}</span>
-                   <span style="color: var(--text-secondary); font-size: 0.75rem; width: 35px; text-align: right;">${percentage}%</span>
+                 <div style="width: 100%; height: 6px; background: var(--bg-color); border-radius: 3px; overflow: hidden; margin-top: 4px;">
+                   <div style="height: 100%; width: ${percentage}%; background: var(--primary-color); border-radius: 3px;"></div>
                  </div>
-               </div>
-               <div style="width: 100%; height: 6px; background: var(--bg-color); border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
-                 <div style="height: 100%; width: ${percentage}%; background: var(--primary-color); border-radius: 3px;"></div>
                </div>
              `;
           }).join('')}
@@ -323,6 +325,9 @@ export async function renderDashboard(container) {
           <span>+${daysToProject}d</span>
         </div>
       </div>
+      
+      <!-- Category Modal Container -->
+      <div id="cat-modal-container"></div>
     `;
     
     container.innerHTML = html;
@@ -409,6 +414,48 @@ export async function renderDashboard(container) {
         }
       });
     }
+    
+    // Category click listener
+    container.querySelectorAll('.category-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const catId = el.dataset.id;
+        const catObj = catMap[catId];
+        const items = lancamentos.filter(l => l.data_vencimento.startsWith(currentMonthStr) && String(l.categoria_id) === String(catId) && l.tipo_lancamento !== 'RECEITA' && l.tipo_lancamento !== 'TRANSFERENCIA');
+        
+        const modalHtml = `
+          <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 20px;">
+            <div style="background: var(--bg-color); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 20px; width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                  <span>${catObj?.icone || '❓'}</span>
+                  <span>${catObj?.nome || 'Gastos'}</span>
+                </h3>
+                <button id="btn-close-cat-modal" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;">&times;</button>
+              </div>
+              
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${items.length === 0 ? `<p style="color: var(--text-secondary); text-align: center;">Nenhum lançamento encontrado.</p>` : items.map(i => `
+                  <div style="background: var(--surface-color); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <div style="font-weight: 600; font-size: 0.9rem;">${i.descricao_custom}</div>
+                      <div style="font-size: 0.75rem; color: var(--text-secondary);">${i.data_vencimento.split('-').reverse().join('/')} • ${users.find(u => u.id === i.pago_por)?.nome || 'Sistema'}</div>
+                    </div>
+                    <div style="font-weight: 700; color: var(--danger-color);">${f.format(i.valor)}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        const modContainer = document.getElementById('cat-modal-container');
+        modContainer.innerHTML = modalHtml;
+        
+        document.getElementById('btn-close-cat-modal').addEventListener('click', () => {
+          modContainer.innerHTML = '';
+        });
+      });
+    });
   }
 
   await render();
