@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { f, showConfirm, showPrompt, withLoading } from '../utils.js';
 
 export async function renderExtrato(container) {
   let activeFilter = 'TODOS';
@@ -7,14 +8,16 @@ export async function renderExtrato(container) {
   async function render() {
     container.innerHTML = `<div style="text-align: center; padding: 20px;">Carregando...</div>`;
     
-    const lancamentosRaw = await db.getTable('lancamentos_mes');
-    const categorias = await db.getTable('categorias');
-    const users = await db.getTable('utilizadores');
+    // ✅ FIX: Promise.all para carregar em paralelo
+    const [lancamentosRaw, categorias, users] = await Promise.all([
+      db.getTable('lancamentos_mes'),
+      db.getTable('categorias'),
+      db.getTable('utilizadores')
+    ]);
     
     const catMap = Object.fromEntries(categorias.map(c => [c.id, c]));
     const userMap = Object.fromEntries(users.map(u => [u.id, u]));
     
-    // Sort by date descending
     lancamentosRaw.sort((a, b) => new Date(b.data_vencimento) - new Date(a.data_vencimento));
     
     const viewMonthStr = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}`;
@@ -22,16 +25,11 @@ export async function renderExtrato(container) {
     const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
     
     const lancamentos = lancamentosRaw.filter(l => {
-      // Month filter
       if (!l.data_vencimento.startsWith(viewMonthStr)) return false;
-      
-      // Status filter
       if (activeFilter === 'PENDENTE') return l.status === 'PENDENTE';
       if (activeFilter === 'PAGO') return l.status === 'PAGO';
       return true;
     });
-
-    const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
     const html = `
       <style>
@@ -52,8 +50,6 @@ export async function renderExtrato(container) {
           cursor: pointer;
           padding: 0 10px;
         }
-        
-        /* Modal Styles */
         .modal-overlay {
           position: fixed;
           top: 0; left: 0; right: 0; bottom: 0;
@@ -135,8 +131,8 @@ export async function renderExtrato(container) {
                   </div>
                   ${l.valor_total ? `
                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
-                      Parcela Mês: ${f.format(l.valor)}<br>
-                      Compra Total: ${f.format(l.valor_total)}
+                      Parcela: ${f.format(l.valor)}<br>
+                      Total compra: ${f.format(l.valor_total)}
                     </div>
                   ` : ''}
                   <div style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); display: inline-block; margin-top: 4px; color: ${l.status === 'PENDENTE' ? 'var(--warning-color)' : 'var(--success-color)'}">
@@ -151,6 +147,7 @@ export async function renderExtrato(container) {
               </div>
               
               <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; border-top: 1px solid var(--glass-border); padding-top: 10px;">
+                <!-- ✅ FIX: usar data-id no btn, não e.target -->
                 <button class="btn-del" data-id="${l.id}" style="background: none; border: none; color: var(--danger-color); font-size: 0.85rem; cursor: pointer; padding: 5px;">Apagar</button>
                 <button class="btn-edit" data-id="${l.id}" style="background: none; border: none; color: var(--primary-color); font-size: 0.85rem; cursor: pointer; padding: 5px;">Editar Tudo</button>
                 
@@ -169,7 +166,6 @@ export async function renderExtrato(container) {
 
     container.innerHTML = html;
 
-    // Month Navigation Listeners
     document.getElementById('btn-prev-month').addEventListener('click', () => {
       viewDate.setMonth(viewDate.getMonth() - 1);
       render();
@@ -180,7 +176,6 @@ export async function renderExtrato(container) {
       render();
     });
 
-    // Filters
     container.querySelectorAll('.btn-filter').forEach(btn => {
       btn.addEventListener('click', (e) => {
         activeFilter = e.target.dataset.filter;
@@ -188,11 +183,15 @@ export async function renderExtrato(container) {
       });
     });
 
-    // Delete
+    // ✅ FIX: showConfirm modal em vez de confirm() nativo
     container.querySelectorAll('.btn-del').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        if(confirm('Tem certeza que deseja apagar este lançamento?')) {
-          await db.delete('lancamentos_mes', e.target.dataset.id);
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id; // ✅ FIX: usar btn.dataset em vez de e.target.dataset
+        const confirmed = await showConfirm('Tem certeza que deseja apagar este lançamento?');
+        if (confirmed) {
+          await withLoading(btn, async () => {
+            await db.delete('lancamentos_mes', id);
+          });
           render();
         }
       });
@@ -201,7 +200,7 @@ export async function renderExtrato(container) {
     // Edit Modal Logic
     container.querySelectorAll('.btn-edit').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const id = e.target.dataset.id;
+        const id = btn.dataset.id; // ✅ FIX: usar btn.dataset
         const l = lancamentosRaw.find(x => String(x.id) === String(id));
         if (!l) return;
         
@@ -248,9 +247,9 @@ export async function renderExtrato(container) {
                 <div class="form-group">
                   <label>Divisão da Despesa</label>
                   <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 0.75rem;">${users[0].nome.charAt(0)}</span>
+                    <span style="font-size: 0.75rem;">${users[0]?.nome || 'A'}</span>
                     <input type="range" id="edit-split" min="0" max="100" value="${defaultSplit}" style="flex: 1;" />
-                    <span style="font-size: 0.75rem;">${users[1].nome.charAt(0)}</span>
+                    <span style="font-size: 0.75rem;">${users[1]?.nome || 'B'}</span>
                   </div>
                   <div id="edit-split-label" style="font-size: 0.75rem; font-weight: bold; color: var(--primary-color); text-align: center; margin-top: 5px;"></div>
                 </div>
@@ -275,7 +274,6 @@ export async function renderExtrato(container) {
         const modalContainer = document.getElementById('edit-modal-container');
         modalContainer.innerHTML = modalHtml;
         
-        // Add dynamic split label logic if it's an expense
         if (!isReceita) {
           const editSplit = document.getElementById('edit-split');
           const editVal = document.getElementById('edit-val');
@@ -284,27 +282,25 @@ export async function renderExtrato(container) {
           const updateEditSplitLabel = () => {
             const percent2 = parseInt(editSplit.value);
             const percent1 = 100 - percent2;
-            const val = parseFloat(editVal.value || '0');
-            
-            if (val > 0) {
-              const v1 = val * (percent1 / 100);
-              const v2 = val * (percent2 / 100);
-              editSplitLabel.innerHTML = `${users[0].nome}: ${f.format(v1)} | ${users[1].nome}: ${f.format(v2)}`;
+            const v = parseFloat(editVal.value || '0');
+            if (v > 0) {
+              editSplitLabel.innerHTML = `${users[0]?.nome || 'A'}: ${f.format(v * (percent1/100))} | ${users[1]?.nome || 'B'}: ${f.format(v * (percent2/100))}`;
             } else {
-              editSplitLabel.textContent = `${percent1}% ${users[0].nome} / ${percent2}% ${users[1].nome}`;
+              editSplitLabel.textContent = `${percent1}% / ${percent2}%`;
             }
           };
           
           editSplit.addEventListener('input', updateEditSplitLabel);
           editVal.addEventListener('input', updateEditSplitLabel);
-          updateEditSplitLabel(); // Initial call
+          updateEditSplitLabel();
         }
         
         document.getElementById('btn-cancel-edit').addEventListener('click', () => {
           modalContainer.innerHTML = '';
         });
         
-        document.getElementById('btn-save-edit').addEventListener('click', async () => {
+        const btnSaveEdit = document.getElementById('btn-save-edit');
+        btnSaveEdit.addEventListener('click', async () => {
           const updates = {
             descricao_custom: document.getElementById('edit-desc').value.trim(),
             valor: parseFloat(document.getElementById('edit-val').value),
@@ -319,32 +315,34 @@ export async function renderExtrato(container) {
           }
           
           if (updates.descricao_custom && !isNaN(updates.valor) && updates.valor > 0) {
-            try {
+            await withLoading(btnSaveEdit, async () => {
               await db.update('lancamentos_mes', id, updates);
-              modalContainer.innerHTML = '';
-              render();
-            } catch (err) {
-              console.error(err);
-              alert("Erro ao editar: " + err.message);
-            }
+            });
+            modalContainer.innerHTML = '';
+            render();
           } else {
-            alert("Preencha os campos corretamente.");
+            alert('Preencha os campos corretamente.');
           }
         });
       });
     });
 
-    // Pay with Confirmation
+    // ✅ FIX: showPrompt modal em vez de prompt() nativo
     container.querySelectorAll('.btn-pay').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const id = e.target.dataset.id;
-        const oldVal = parseFloat(e.target.dataset.val);
-        const newValStr = prompt("O valor estimado era " + f.format(oldVal) + ".\nInsira o valor real final desta fatura (apenas números):", oldVal);
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const oldVal = parseFloat(btn.dataset.val);
+        const newValStr = await showPrompt(
+          `Valor estimado: ${f.format(oldVal)}\nInsira o valor real pago:`,
+          oldVal.toFixed(2)
+        );
         
         if (newValStr !== null) {
-          let newVal = parseFloat(newValStr.replace(',', '.'));
+          let newVal = parseFloat(String(newValStr).replace(',', '.'));
           if (!isNaN(newVal) && newVal > 0) {
-            await db.update('lancamentos_mes', id, { status: 'PAGO', valor: newVal });
+            await withLoading(btn, async () => {
+              await db.update('lancamentos_mes', id, { status: 'PAGO', valor: newVal });
+            });
             render();
           }
         }

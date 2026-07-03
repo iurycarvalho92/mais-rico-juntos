@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { getCurrentMonthStr } from './utils.js';
 
 export async function runRecurrenceEngine() {
   const currentDate = new Date();
@@ -7,8 +8,16 @@ export async function runRecurrenceEngine() {
   
   const runKey = `engine_run_${currentYear}_${currentMonth}`;
   
-  // If already run for this month, skip
-  if (localStorage.getItem(runKey)) {
+  // ✅ FIX: Usar Firestore em vez de localStorage para controle multi-device
+  // Assim ambos os dispositivos consultam a mesma flag e nunca duplicam
+  try {
+    const metadata = await db.getTable('metadata');
+    if (metadata.find(m => m.id === runKey)) {
+      console.log('Engine já rodou neste mês (Firestore).');
+      return;
+    }
+  } catch (e) {
+    console.warn('Could not check engine metadata, skipping:', e);
     return;
   }
   
@@ -17,7 +26,7 @@ export async function runRecurrenceEngine() {
   const receitas = await db.getTable('receitas_fixas');
   const despesas = await db.getTable('despesas_fixas');
   
-  const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+  const currentMonthStr = getCurrentMonthStr();
   
   // 1. Process Receitas Fixas
   for (const r of receitas) {
@@ -28,7 +37,7 @@ export async function runRecurrenceEngine() {
     await db.insert('lancamentos_mes', {
       valor: r.valor_estimado,
       data_vencimento: dataVencimento,
-      categoria_id: null, // Receita doesn't necessarily have a category like expense
+      categoria_id: null,
       descricao_custom: r.descricao,
       tipo_lancamento: 'RECEITA',
       pago_por: r.utilizador_id,
@@ -53,13 +62,14 @@ export async function runRecurrenceEngine() {
       tipo_lancamento: 'DESPESA_FIXA',
       pago_por: d.pago_por_padrao,
       regra_divisao: d.regra_divisao || null,
-      regra_divisao_percent: d.regra_divisao_percent !== undefined ? d.regra_divisao_percent : 50, // default 50/50 if missing
+      regra_divisao_percent: d.regra_divisao_percent !== undefined ? d.regra_divisao_percent : 50,
       status: 'PENDENTE'
     });
     
     await db.update('despesas_fixas', d.id, { ultimo_mes_gerado: currentMonthStr });
   }
   
-  localStorage.setItem(runKey, 'true');
+  // ✅ FIX: Marcar como executado no Firestore (não no localStorage)
+  await db.insert('metadata', { id: runKey, executado: true, data: currentMonthStr });
   console.log('Recurrence Engine finished.');
 }

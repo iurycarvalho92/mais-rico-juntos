@@ -29,8 +29,6 @@ const initialData = {
   objetivos: []
 };
 
-// Caching to reduce reads if needed (simple implementation)
-let localCache = {};
 
 export const db = {
   async init() {
@@ -86,10 +84,15 @@ export const db = {
   async syncCategorias() {
     try {
       const snap = await getDocs(collection(firestore, 'categorias'));
-      const existingIds = snap.docs.map(d => parseInt(d.id));
+      const existingMap = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
       
+      // ✅ FIX: Só escreve categorias que de facto mudaram (evita 12 writes desnecessários)
       for (const item of initialData.categorias) {
-        await setDoc(doc(firestore, 'categorias', String(item.id)), item);
+        const existing = existingMap[String(item.id)];
+        const changed = !existing || existing.nome !== item.nome || existing.icone !== item.icone;
+        if (changed) {
+          await setDoc(doc(firestore, 'categorias', String(item.id)), item);
+        }
       }
     } catch (e) {
       console.error("Error syncing categories:", e);

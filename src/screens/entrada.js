@@ -1,10 +1,12 @@
 import { db } from '../db.js';
-import { scanReceipt } from '../ai_scanner.js';
+import { f, toLocalDateStr, withLoading } from '../utils.js';
 import { navigate } from '../../main.js';
 
 export async function renderEntrada(container) {
-  const users = await db.getTable('utilizadores');
-  const categorias = await db.getTable('categorias');
+  const [users, categorias] = await Promise.all([
+    db.getTable('utilizadores'),
+    db.getTable('categorias')
+  ]);
   
   let currentDisplay = '0';
   
@@ -68,9 +70,10 @@ export async function renderEntrada(container) {
 
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <h2 style="margin: 0;">Novo Lançamento</h2>
-      <button id="btn-scan" class="btn btn-primary" style="width: auto; padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; gap: 8px;">
+      <label id="btn-scan" class="btn btn-primary" style="width: auto; padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
         <span>📷</span> IA Scan
-      </button>
+        <input type="file" id="scan-file-input" accept="image/*" capture="camera" style="display: none;" />
+      </label>
     </div>
     
     <div class="display-value" id="val-display">R$ 0,00</div>
@@ -120,9 +123,9 @@ export async function renderEntrada(container) {
         <div class="form-group" style="flex: 1;">
           <label>Divisão da Despesa</label>
           <div class="slider-container">
-            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[0].nome.charAt(0)}</span>
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[0]?.nome.charAt(0) || 'A'}</span>
             <input type="range" id="input-split-slider" min="0" max="100" value="50" style="flex: 1;" />
-            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[1].nome.charAt(0)}</span>
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">${users[1]?.nome.charAt(0) || 'B'}</span>
           </div>
           <div class="slider-label" id="split-label">50% / 50%</div>
         </div>
@@ -130,7 +133,7 @@ export async function renderEntrada(container) {
       
       <div class="form-group advanced-options">
         <label>Data do Lançamento</label>
-        <input type="date" id="input-date" value="${new Date().toISOString().split('T')[0]}" />
+        <input type="date" id="input-date" value="${toLocalDateStr(new Date())}" />
         
         <label style="margin-top: 10px;">Repetição</label>
         <select id="select-repeat">
@@ -151,7 +154,6 @@ export async function renderEntrada(container) {
   
   container.innerHTML = html;
   
-  // Logic
   const valDisplay = document.getElementById('val-display');
   const inputDesc = document.getElementById('input-desc');
   const selectCat = document.getElementById('select-cat');
@@ -162,14 +164,10 @@ export async function renderEntrada(container) {
   const selectRepeat = document.getElementById('select-repeat');
   const parcelasContainer = document.getElementById('parcelas-container');
   const inputParcelas = document.getElementById('input-parcelas');
-  
   const aiLoading = document.getElementById('ai-loading');
   const numpad = document.getElementById('numpad');
+  const btnSave = document.getElementById('btn-save');
   
-  // Format currency
-  const f = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-  
-  // Toggle Parcelas input
   selectRepeat.addEventListener('change', (e) => {
     parcelasContainer.style.display = e.target.value === 'parcelada' ? 'block' : 'none';
   });
@@ -177,9 +175,10 @@ export async function renderEntrada(container) {
   function updateDisplay() {
     const num = parseFloat(currentDisplay || '0');
     valDisplay.textContent = f.format(num);
-    updateSplitLabel(); // Update monetary split preview
+    updateSplitLabel();
   }
   
+  // ✅ FIX: Função de split centralizada (evita duplicação)
   function updateSplitLabel() {
     const percent2 = parseInt(splitSlider.value);
     const percent1 = 100 - percent2;
@@ -188,17 +187,15 @@ export async function renderEntrada(container) {
     if (num > 0) {
       const val1 = num * (percent1 / 100);
       const val2 = num * (percent2 / 100);
-      splitLabel.innerHTML = `${users[0].nome}: <span style="color:var(--text-primary)">${f.format(val1)}</span> | ${users[1].nome}: <span style="color:var(--text-primary)">${f.format(val2)}</span>`;
+      splitLabel.innerHTML = `${users[0]?.nome}: <span style="color:var(--text-primary)">${f.format(val1)}</span> | ${users[1]?.nome}: <span style="color:var(--text-primary)">${f.format(val2)}</span>`;
     } else {
-      splitLabel.textContent = `${percent1}% ${users[0].nome} / ${percent2}% ${users[1].nome}`;
+      splitLabel.textContent = `${percent1}% ${users[0]?.nome || 'A'} / ${percent2}% ${users[1]?.nome || 'B'}`;
     }
   }
   
-  // Initial Split label
   updateSplitLabel();
   splitSlider.addEventListener('input', updateSplitLabel);
   
-  // Numpad events
   container.querySelectorAll('.num-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const char = e.target.textContent;
@@ -214,55 +211,62 @@ export async function renderEntrada(container) {
     });
   });
   
-  // AI Scan event
-  document.getElementById('btn-scan').addEventListener('click', async () => {
+  // ✅ FIX: AI Scan agora abre câmera real
+  document.getElementById('scan-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
     numpad.style.display = 'none';
     aiLoading.style.display = 'block';
     
     try {
-      // Dummy image string for the demo, in a real app this opens a camera
-      const data = await scanReceipt("dummy_base64_image");
-      
-      currentDisplay = data.valor_total.toString();
-      updateDisplay();
-      inputDesc.value = data.estabelecimento;
-      
-      const cat = categorias.find(c => c.nome.toLowerCase() === data.categoria_sugerida.toLowerCase());
-      if (cat) selectCat.value = cat.id;
-      
-    } catch (e) {
-      alert("Erro ao processar imagem");
-    } finally {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target.result.split(',')[1];
+        try {
+          const { scanReceipt } = await import('../ai_scanner.js');
+          const data = await scanReceipt(base64);
+          currentDisplay = data.valor_total.toString();
+          updateDisplay();
+          inputDesc.value = data.estabelecimento;
+          const cat = categorias.find(c => c.nome.toLowerCase() === data.categoria_sugerida.toLowerCase());
+          if (cat) selectCat.value = cat.id;
+        } catch (err) {
+          alert('Erro ao processar imagem: ' + err.message);
+        } finally {
+          aiLoading.style.display = 'none';
+          numpad.style.display = 'grid';
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      alert('Erro ao ler arquivo.');
       aiLoading.style.display = 'none';
       numpad.style.display = 'grid';
     }
   });
   
-  // Save event
-  document.getElementById('btn-save').addEventListener('click', async () => {
+  // ✅ FIX: withLoading evita duplo clique
+  btnSave.addEventListener('click', async () => {
     const val = parseFloat(currentDisplay);
     if (isNaN(val) || val <= 0) {
-      alert("Insira um valor válido.");
+      alert('Insira um valor válido.');
       return;
     }
     if (!inputDesc.value.trim()) {
-      alert("Insira uma descrição.");
+      alert('Insira uma descrição.');
       return;
     }
     
-    const selectedDate = new Date(inputDate.value);
+    // ✅ FIX: Usar toLocalDateStr para evitar bug de fuso horário nas parcelas
+    const targetDate = new Date(inputDate.value + 'T12:00:00');
     const today = new Date();
-    // Reset hours to compare dates only
-    today.setHours(0,0,0,0);
-    // Adjust selected date due to timezone issues with value string
-    const targetDate = new Date(selectedDate.getTime() + selectedDate.getTimezoneOffset() * 60000);
-    
+    today.setHours(0, 0, 0, 0);
     const isFuture = targetDate > today;
     const status = isFuture ? 'PENDENTE' : 'PAGO';
     
-    try {
+    await withLoading(btnSave, async () => {
       if (selectRepeat.value === 'recorrente') {
-        // Salva como despesa fixa na tabela de configurações para os meses seguintes
         await db.insert('despesas_fixas', {
           categoria_id: parseInt(selectCat.value),
           descricao: inputDesc.value.trim(),
@@ -271,7 +275,6 @@ export async function renderEntrada(container) {
           regra_divisao_percent: parseInt(splitSlider.value),
           pago_por_padrao: selectPayer.value
         });
-        // Também gera o lançamento do mês atual
         await db.insert('lancamentos_mes', {
           valor: val,
           data_vencimento: inputDate.value,
@@ -288,7 +291,8 @@ export async function renderEntrada(container) {
         for (let i = 0; i < numParcelas; i++) {
           const d = new Date(targetDate);
           d.setMonth(d.getMonth() + i);
-          const dateStr = d.toISOString().split('T')[0];
+          // ✅ FIX: toLocalDateStr evita o bug de fuso horário
+          const dateStr = toLocalDateStr(d);
           const isFutureParc = d > today;
           
           await db.insert('lancamentos_mes', {
@@ -304,7 +308,6 @@ export async function renderEntrada(container) {
           });
         }
       } else {
-        // Única
         await db.insert('lancamentos_mes', {
           valor: val,
           data_vencimento: inputDate.value,
@@ -318,9 +321,6 @@ export async function renderEntrada(container) {
       }
       currentDisplay = '0';
       navigate('dashboard');
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao salvar: " + err.message);
-    }
+    });
   });
 }
