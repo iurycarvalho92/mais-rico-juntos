@@ -1,5 +1,5 @@
 import { db } from '../db.js';
-import { f, getCurrentMonthStr } from '../utils.js';
+import { f, getCurrentMonthStr, showConfirm, showPrompt, withLoading } from '../utils.js';
 
 export async function renderDashboard(container) {
   let daysToProject = 30;
@@ -360,7 +360,6 @@ export async function renderDashboard(container) {
     const btnQuitar = document.getElementById('btn-quitar');
     if (btnQuitar) {
       btnQuitar.addEventListener('click', async () => {
-        const { showPrompt, withLoading } = await import('../utils.js');
         const absBalance = Math.abs(u1Balance);
         const valorStr = await showPrompt(
           `💸 ${devedor.nome} deve a ${credor.nome}.\nInsira o valor pago para abater a dívida:`,
@@ -394,7 +393,6 @@ export async function renderDashboard(container) {
     // ✅ FIX: Lembretes com modal in-app
     container.querySelectorAll('.btn-lembrete-pay').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const { showPrompt, withLoading } = await import('../utils.js');
         const id = btn.dataset.id;
         const oldVal = parseFloat(btn.dataset.val);
         const newValStr = await showPrompt(

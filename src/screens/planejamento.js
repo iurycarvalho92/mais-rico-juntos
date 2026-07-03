@@ -1,5 +1,5 @@
 import { db } from '../db.js';
-import { f, getCurrentMonthStr } from '../utils.js';
+import { f, getCurrentMonthStr, showConfirm, showPrompt, withLoading } from '../utils.js';
 
 export async function renderPlanejamento(container) {
   container.innerHTML = `<div style="text-align: center; padding: 20px;">Carregando...</div>`;
@@ -162,7 +162,6 @@ export async function renderPlanejamento(container) {
   // ✅ NOVO: Depositar na meta
   container.querySelectorAll('.btn-deposit-goal').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const { showPrompt, withLoading } = await import('../utils.js');
       const id = btn.dataset.id;
       const atual = parseFloat(btn.dataset.atual);
       const valStr = await showPrompt('Quanto deseja depositar nesta meta? (R$)', '');
@@ -181,7 +180,6 @@ export async function renderPlanejamento(container) {
   // ✅ NOVO: Deletar meta
   container.querySelectorAll('.btn-delete-goal').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const { showConfirm } = await import('../utils.js');
       const confirmed = await showConfirm('Apagar esta meta?');
       if (confirmed) {
         await db.delete('objetivos', btn.dataset.id);
